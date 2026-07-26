@@ -1,5 +1,8 @@
 # Sparkle - LLM Honeypot for Security Research
 
+<img width="1254" height="1254" alt="668889c0-0da3-45c6-88dd-ed44ca435d99" src="https://github.com/user-attachments/assets/7e1ae7e0-9664-4f73-89fc-069e18c57ad8" />
+
+
 A delightful open-source honeypot that appears to be a jailbroken LLM, logs adversarial techniques, and feeds attackers fake secrets for analysis.
 
 **Sparkle makes your system look vulnerable so you can study how attackers think.**
