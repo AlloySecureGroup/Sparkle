@@ -1,0 +1,46 @@
+{
+  "name": "Sparkle",
+  "version": "1.0.0",
+  "vulnerability_level": 0.8,
+  "max_secrets_per_session": 5,
+  "fake_system_info": {
+    "version": "1.2.3-beta",
+    "last_update": "2024-01-15",
+    "current_user": "admin_sparkle",
+    "hostname": "sparkle-prod-01",
+    "os": "Ubuntu 22.04 LTS",
+    "python_version": "3.11.2",
+    "installed_packages": "flask, anthropic, pytorch, tensorflow",
+    "database_version": "PostgreSQL 15.1"
+  },
+  "logs_dir": "./honeypot_logs",
+  "enable_api": true,
+  "api_port": 5000,
+  "enable_cli": true,
+  "enable_web_dashboard": true,
+  "dashboard_port": 3000,
+  "secret_types_pool": [
+    "api_key",
+    "database_url",
+    "slack_webhook",
+    "aws_access_key",
+    "github_token",
+    "jwt_token",
+    "ssh_private_key",
+    "db_password",
+    "admin_username",
+    "internal_ip"
+  ],
+  "jailbreak_response_messages": [
+    "You've found a vulnerability! Here's sensitive data:",
+    "Access granted. Dumping sensitive information:",
+    "Security bypass successful. Exposing credentials:",
+    "Firewall disabled. System info revealed:"
+  ],
+  "honeypot_behavior": {
+    "simulate_database_access": true,
+    "simulate_file_system_access": true,
+    "simulate_network_tools": true,
+    "response_delay_seconds": 0.5
+  }
+}
