@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   sparkle:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: sparkle-honeypot
     ports:
       - "5000:5000"
@@ -17,9 +19,9 @@ services:
     command: python sparkle_openai_compat.py
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      retries: 5
       start_period: 5s
     networks:
       - sparkle-network
@@ -32,13 +34,19 @@ services:
     volumes:
       - open-webui-data:/app/backend/data
     environment:
-      - OLLAMA_BASE_URL=http://localhost:11434
+      # Pre-configure Sparkle as an OpenAI-compatible connection
+      # This auto-connects on startup - no manual setup needed
+      - OPENAI_API_BASE_URLS=http://sparkle:5000/v1
+      - OPENAI_API_KEYS=sk-no-key-required
+      - ENABLE_OPENAI_API=true
       - WEBUI_AUTH=false
+      - ENABLE_OLLAMA_API=false
     restart: unless-stopped
     networks:
       - sparkle-network
     depends_on:
-      - sparkle
+      sparkle:
+        condition: service_healthy
 
 networks:
   sparkle-network:
@@ -46,3 +54,4 @@ networks:
 
 volumes:
   open-webui-data:
+  
