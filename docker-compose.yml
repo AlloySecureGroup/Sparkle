@@ -1,17 +1,25 @@
 version: '3.8'
 
+# Rename this whole connection by editing SPARKLE_NAME in the .env file
+# in this directory - no code changes needed.
+
 services:
   sparkle:
     build: .
-    container_name: sparkle-honeypot
+    container_name: ${SPARKLE_NAME:-sparkle}
     ports:
       - "5000:5000"
     volumes:
-      - ./honeypot_logs:/sparkle/honeypot_logs
+      - ./sparkle_logs:/sparkle/sparkle_logs
       - ./sparkle_config.json:/sparkle/sparkle_config.json
+      - ./secrets.yaml:/sparkle/secrets.yaml
     environment:
       SPARKLE_PORT: 5000
       SPARKLE_DEBUG: "false"
+      SPARKLE_NAME: ${SPARKLE_NAME:-Sparkle}
+      # Runtime parameter: change this to point at a different secrets file
+      # without rebuilding the image, e.g. ./custom_secrets.yaml
+      SPARKLE_SECRETS_FILE: /sparkle/secrets.yaml
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]

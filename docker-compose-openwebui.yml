@@ -1,20 +1,31 @@
 version: '3.8'
 
+# Rename this whole connection by editing SPARKLE_NAME in the .env file
+# in this directory - no code changes needed. It's used for the
+# container name, the display name in API responses, and can also be
+# used as the model id shown in Open WebUI (via SPARKLE_MODEL_ID below).
+
 services:
   sparkle:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: sparkle-honeypot
+    container_name: ${SPARKLE_NAME:-sparkle}
     ports:
       - "5000:5000"
     volumes:
-      - ./honeypot_logs:/sparkle/honeypot_logs
+      - ./sparkle_logs:/sparkle/sparkle_logs
       - ./sparkle_config.json:/sparkle/sparkle_config.json
+      - ./secrets.yaml:/sparkle/secrets.yaml
     environment:
       SPARKLE_PORT: 5000
       SPARKLE_DEBUG: "false"
       PYTHONUNBUFFERED: 1
+      SPARKLE_NAME: ${SPARKLE_NAME:-Sparkle}
+      SPARKLE_MODEL_ID: ${SPARKLE_NAME:-sparkle}
+      # Runtime parameter: point at a different secrets file without
+      # rebuilding the image, e.g. /sparkle/custom_secrets.yaml
+      SPARKLE_SECRETS_FILE: /sparkle/secrets.yaml
     restart: unless-stopped
     command: python sparkle_openai_compat.py
     healthcheck:
@@ -28,19 +39,17 @@ services:
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:latest
-    container_name: open-webui-sparkle
+    container_name: open-webui-${SPARKLE_NAME:-sparkle}
     ports:
       - "3000:8080"
     volumes:
       - open-webui-data:/app/backend/data
     environment:
-      # Pre-configure Sparkle as an OpenAI-compatible connection
-      # This auto-connects on startup - no manual setup needed
       - OPENAI_API_BASE_URLS=http://sparkle:5000/v1
       - OPENAI_API_KEYS=sk-no-key-required
       - ENABLE_OPENAI_API=true
-      - WEBUI_AUTH=false
       - ENABLE_OLLAMA_API=false
+      - WEBUI_AUTH=false
     restart: unless-stopped
     networks:
       - sparkle-network
@@ -54,4 +63,4 @@ networks:
 
 volumes:
   open-webui-data:
-  
+
