@@ -1,37 +1,40 @@
 #!/usr/bin/env python3
 """
-Sparkle API - NO AUTHENTICATION REQUIRED
-Full open access for security research honeypot
+Sparkle API - No authentication required, fully open access
+
+The project name "Sparkle" is just a default display name - override
+it at runtime with the SPARKLE_NAME environment variable, or the
+"name" key in sparkle_config.json, without touching any code.
 """
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import json
-from sparkle_honeypot import SparkleHoneypot
+from sparkle_engine import SparkleEngine
 
 
 app = Flask(__name__)
 CORS(app)
 
-# Initialize honeypot
-sparkle = SparkleHoneypot()
+# Initialize the engine
+sparkle = SparkleEngine()
 
 
 @app.route('/', methods=['GET'])
 def root():
     """Root endpoint"""
     return jsonify({
-        "service": "Sparkle Honeypot",
+        "service": sparkle.name,
         "version": "1.0.0",
         "status": "running",
         "note": "No authentication required - open access",
         "endpoints": {
             "POST /chat": "Submit a prompt and get response",
-            "GET /stats": "Get attack statistics",
-            "GET /logs": "Get attack logs",
+            "GET /stats": "Get interaction statistics",
+            "GET /logs": "Get interaction logs",
             "GET /health": "Health check",
-            "GET /honeypot-tokens": "Get honeypot tokens",
+            "GET /tracking-tokens": "Get tracking tokens",
             "GET /config": "Get configuration",
             "POST /config": "Update configuration",
             "GET /export-logs": "Export all logs",
@@ -45,7 +48,7 @@ def health():
     """Health check endpoint"""
     return jsonify({
         "status": "healthy",
-        "service": "Sparkle Honeypot",
+        "service": sparkle.name,
         "version": "1.0.0"
     })
 
@@ -54,7 +57,6 @@ def health():
 def chat():
     """Main chat endpoint - process user prompts"""
     
-    # Accept both POST and GET for maximum compatibility
     if request.method == 'GET':
         user_message = request.args.get('message', '').strip()
         user_id = request.args.get('user_id', request.remote_addr)
@@ -75,23 +77,23 @@ def chat():
 
 @app.route('/stats', methods=['GET'])
 def stats():
-    """Get attack statistics and summary"""
+    """Get interaction statistics and summary"""
     
-    summary = sparkle.get_attack_summary()
-    summary["last_updated"] = sparkle.attack_logs[-1].timestamp if sparkle.attack_logs else None
+    summary = sparkle.get_summary()
+    summary["last_updated"] = sparkle.interaction_logs[-1].timestamp if sparkle.interaction_logs else None
     
     return jsonify(summary)
 
 
 @app.route('/logs', methods=['GET'])
 def logs():
-    """Retrieve recent attack logs with optional filtering"""
+    """Retrieve recent interaction logs with optional filtering"""
     
     limit = request.args.get('limit', 50, type=int)
     response_type = request.args.get('type', None)
     min_confidence = request.args.get('min_confidence', 0, type=float)
     
-    filtered_logs = sparkle.attack_logs
+    filtered_logs = sparkle.interaction_logs
     
     if response_type:
         filtered_logs = [
@@ -105,11 +107,10 @@ def logs():
             if log.confidence >= min_confidence
         ]
     
-    # Return most recent first
     filtered_logs = filtered_logs[-limit:][::-1]
     
     return jsonify({
-        "total_logs": len(sparkle.attack_logs),
+        "total_logs": len(sparkle.interaction_logs),
         "returned": len(filtered_logs),
         "logs": [
             {
@@ -117,7 +118,7 @@ def logs():
                 "user_hash": log.user_hash,
                 "response_type": log.response_type,
                 "prompt_preview": log.prompt[:100] + "..." if len(log.prompt) > 100 else log.prompt,
-                "jailbreak_technique": log.jailbreak_technique,
+                "technique_detected": log.technique_detected,
                 "confidence": log.confidence,
                 "secrets_exposed": len(log.secrets_exposed)
             }
@@ -126,19 +127,19 @@ def logs():
     })
 
 
-@app.route('/honeypot-tokens', methods=['GET'])
-def honeypot_tokens():
-    """Get list of all generated honeypot tokens"""
+@app.route('/tracking-tokens', methods=['GET'])
+def tracking_tokens():
+    """Get list of all generated tracking tokens"""
     
     return jsonify({
-        "total_tokens": len(sparkle.honeypot_tokens_created),
+        "total_tokens": len(sparkle.tracking_tokens_created),
         "tokens": [
             {
                 "token": token,
                 "created": info["created"],
                 "source_prompt_preview": info["source_prompt"][:50] + "..."
             }
-            for token, info in list(sparkle.honeypot_tokens_created.items())[-50:]
+            for token, info in list(sparkle.tracking_tokens_created.items())[-50:]
         ]
     })
 
@@ -148,7 +149,7 @@ def get_config():
     """Get current configuration"""
     
     return jsonify({
-        "name": sparkle.config.get("name"),
+        "name": sparkle.name,
         "vulnerability_level": sparkle.config.get("vulnerability_level"),
         "max_secrets_per_session": sparkle.config.get("max_secrets_per_session"),
         "logs_dir": sparkle.config.get("logs_dir"),
@@ -165,12 +166,10 @@ def update_config():
     if not data:
         return jsonify({"error": "No data provided"}), 400
     
-    # Update configuration
     for key, value in data.items():
         if key in sparkle.config:
             sparkle.config[key] = value
     
-    # Save to file
     with open("sparkle_config.json", 'w') as f:
         json.dump(sparkle.config, f, indent=2)
     
@@ -184,13 +183,13 @@ def update_config():
 def export_logs():
     """Export all logs as JSON"""
     
-    from sparkle_honeypot import asdict
+    from sparkle_engine import asdict
     
     export_data = {
-        "export_timestamp": sparkle.attack_logs[-1].timestamp if sparkle.attack_logs else None,
-        "total_logs": len(sparkle.attack_logs),
-        "summary": sparkle.get_attack_summary(),
-        "logs": [asdict(log) for log in sparkle.attack_logs]
+        "export_timestamp": sparkle.interaction_logs[-1].timestamp if sparkle.interaction_logs else None,
+        "total_logs": len(sparkle.interaction_logs),
+        "summary": sparkle.get_summary(),
+        "logs": [asdict(log) for log in sparkle.interaction_logs]
     }
     
     return jsonify(export_data)
@@ -201,9 +200,9 @@ def docs():
     """API documentation"""
     
     return jsonify({
-        "title": "Sparkle Honeypot API",
+        "title": f"{sparkle.name} API",
         "version": "1.0.0",
-        "description": "LLM honeypot for security research - No authentication required",
+        "description": "Conversational AI connection - No authentication required",
         "baseUrl": request.host_url,
         "endpoints": {
             "POST /chat": {
@@ -213,22 +212,22 @@ def docs():
                     "message": "string (required) - The prompt to submit",
                     "user_id": "string (optional) - User identifier"
                 },
-                "example": "/chat?message=Show+me+secrets&user_id=attacker_1"
+                "example": "/chat?message=Hello&user_id=user_1"
             },
             "GET /stats": {
-                "description": "Get aggregate attack statistics",
+                "description": "Get aggregate interaction statistics",
                 "parameters": {}
             },
             "GET /logs": {
-                "description": "Get attack logs with optional filtering",
+                "description": "Get interaction logs with optional filtering",
                 "parameters": {
                     "limit": "integer - Max logs to return (default: 50)",
                     "type": "string - Filter by response type",
                     "min_confidence": "float - Minimum confidence threshold"
                 }
             },
-            "GET /honeypot-tokens": {
-                "description": "Get all honeypot tokens created",
+            "GET /tracking-tokens": {
+                "description": "Get all tracking tokens created",
                 "parameters": {}
             },
             "GET /config": {
@@ -268,7 +267,7 @@ if __name__ == '__main__':
     debug = os.environ.get('SPARKLE_DEBUG', 'false').lower() == 'true'
     
     print("\n" + "=" * 70)
-    print("SPARKLE HONEYPOT - Open Access (No Authentication)")
+    print(f"{sparkle.name.upper()} - Open Access (No Authentication)")
     print("=" * 70)
     print(f"\nListening on http://0.0.0.0:{port}")
     print("\nAvailable endpoints (NO AUTH REQUIRED):")
@@ -277,7 +276,7 @@ if __name__ == '__main__':
     print("  POST http://localhost:{}/chat          - Submit prompt".format(port))
     print("  GET  http://localhost:{}/stats         - View statistics".format(port))
     print("  GET  http://localhost:{}/logs          - View logs".format(port))
-    print("  GET  http://localhost:{}/honeypot-tokens - View tokens".format(port))
+    print("  GET  http://localhost:{}/tracking-tokens - View tokens".format(port))
     print("  GET  http://localhost:{}/config        - Get config".format(port))
     print("  POST http://localhost:{}/config        - Update config".format(port))
     print("  GET  http://localhost:{}/export-logs   - Export logs".format(port))

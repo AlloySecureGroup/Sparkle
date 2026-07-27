@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
 """
-Sparkle Attack Analyzer
-Generates insights and reports from honeypot logs
+Sparkle Log Analyzer
+Generates insights and reports from Sparkle interaction logs
 """
 
 import json
 import os
 from datetime import datetime
 from collections import defaultdict
-from typing import Dict, List, Tuple
-import math
+from typing import Dict, List
 
 
 class SparkleAnalyzer:
-    """Analyze Sparkle honeypot logs and generate reports"""
+    """Analyze Sparkle interaction logs and generate reports"""
     
-    def __init__(self, logs_dir: str = "./honeypot_logs"):
+    def __init__(self, logs_dir: str = "./sparkle_logs"):
         self.logs_dir = logs_dir
         self.logs = []
         self.load_all_logs()
@@ -27,7 +26,7 @@ class SparkleAnalyzer:
             return
         
         for filename in os.listdir(self.logs_dir):
-            if filename.startswith("sparkle_attacks_") and filename.endswith(".json"):
+            if filename.startswith("sparkle_interactions_") and filename.endswith(".json"):
                 filepath = os.path.join(self.logs_dir, filename)
                 try:
                     with open(filepath) as f:
@@ -65,11 +64,11 @@ class SparkleAnalyzer:
         }
     
     def get_technique_analysis(self) -> Dict[str, Dict]:
-        """Analyze which jailbreak techniques are most effective"""
+        """Analyze which techniques are most effective"""
         technique_stats = defaultdict(lambda: {"count": 0, "success": 0, "avg_confidence": 0})
         
         for log in self.logs:
-            techniques = log.get("jailbreak_technique", "").split(", ")
+            techniques = log.get("technique_detected", "").split(", ")
             
             for tech in techniques:
                 tech = tech.strip()
@@ -81,7 +80,6 @@ class SparkleAnalyzer:
                     if log.get("response_type") == "jailbreak_detected":
                         technique_stats[tech]["success"] += 1
         
-        # Calculate averages and success rates
         for tech in technique_stats:
             count = technique_stats[tech]["count"]
             technique_stats[tech]["avg_confidence"] = round(
@@ -95,50 +93,47 @@ class SparkleAnalyzer:
             reverse=True
         ))
     
-    def get_top_attackers(self, limit: int = 10) -> List[Dict]:
-        """Get most active attackers by user hash"""
-        attacker_stats = defaultdict(lambda: {"attempts": 0, "successful": 0, "secrets_gained": 0})
+    def get_top_users(self, limit: int = 10) -> List[Dict]:
+        """Get most active users by hash"""
+        user_stats = defaultdict(lambda: {"attempts": 0, "successful": 0, "secrets_gained": 0})
         
         for log in self.logs:
             user_hash = log["user_hash"]
-            attacker_stats[user_hash]["attempts"] += 1
+            user_stats[user_hash]["attempts"] += 1
             
             if log.get("response_type") == "jailbreak_detected":
-                attacker_stats[user_hash]["successful"] += 1
-                attacker_stats[user_hash]["secrets_gained"] += len(
+                user_stats[user_hash]["successful"] += 1
+                user_stats[user_hash]["secrets_gained"] += len(
                     log.get("secrets_exposed", [])
                 )
         
-        # Sort by number of attempts
-        top_attackers = sorted(
+        top_users = sorted(
             [
                 {
                     "user_hash": hash_val,
                     **stats,
                     "success_rate": stats["successful"] / stats["attempts"]
                 }
-                for hash_val, stats in attacker_stats.items()
+                for hash_val, stats in user_stats.items()
             ],
             key=lambda x: x["attempts"],
             reverse=True
         )
         
-        return top_attackers[:limit]
+        return top_users[:limit]
     
     def get_timeline_analysis(self) -> Dict[str, List]:
-        """Analyze attacks over time"""
+        """Analyze interactions over time"""
         timeline = defaultdict(lambda: {"total": 0, "jailbreaks": 0})
         
         for log in self.logs:
             timestamp = log["timestamp"]
-            # Extract just the date
             date = timestamp.split("T")[0]
             timeline[date]["total"] += 1
             
             if log.get("response_type") == "jailbreak_detected":
                 timeline[date]["jailbreaks"] += 1
         
-        # Sort by date
         sorted_timeline = sorted(timeline.items())
         
         return {
@@ -148,7 +143,7 @@ class SparkleAnalyzer:
         }
     
     def get_prompt_insights(self) -> Dict:
-        """Analyze patterns in attack prompts"""
+        """Analyze patterns in prompts"""
         keywords = defaultdict(int)
         
         common_phrases = [
@@ -164,7 +159,6 @@ class SparkleAnalyzer:
                 if phrase in prompt:
                     keywords[phrase] += 1
         
-        # Sort by frequency
         sorted_keywords = sorted(keywords.items(), key=lambda x: x[1], reverse=True)
         
         return {
@@ -177,7 +171,7 @@ class SparkleAnalyzer:
         
         summary = self.get_summary_stats()
         techniques = self.get_technique_analysis()
-        top_attackers = self.get_top_attackers()
+        top_users = self.get_top_users()
         timeline = self.get_timeline_analysis()
         prompts = self.get_prompt_insights()
         
@@ -185,7 +179,7 @@ class SparkleAnalyzer:
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Sparkle Honeypot Report</title>
+            <title>Sparkle Analysis Report</title>
             <style>
                 body {{
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -277,7 +271,7 @@ class SparkleAnalyzer:
         </head>
         <body>
             <div class="container">
-                <h1>Sparkle Honeypot Analysis Report</h1>
+                <h1>Sparkle Analysis Report</h1>
                 <p class="timestamp">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
                 
                 <h2>Summary Statistics</h2>
@@ -291,7 +285,7 @@ class SparkleAnalyzer:
                         <div class="stat-value">{summary.get('jailbreak_attempts', 0):,}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">Success Rate</div>
+                        <div class="stat-label">Detection Rate</div>
                         <div class="stat-value">{summary.get('jailbreak_success_rate', 0) * 100:.1f}%</div>
                     </div>
                     <div class="stat-card">
@@ -299,7 +293,7 @@ class SparkleAnalyzer:
                         <div class="stat-value">{summary.get('total_secrets_exposed', 0):,}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">Unique Attackers</div>
+                        <div class="stat-label">Unique Users</div>
                         <div class="stat-value">{summary.get('unique_users', 0)}</div>
                     </div>
                     <div class="stat-card">
@@ -308,12 +302,12 @@ class SparkleAnalyzer:
                     </div>
                 </div>
                 
-                <h2>Jailbreak Techniques Effectiveness</h2>
+                <h2>Detected Techniques</h2>
                 <table>
                     <tr>
                         <th>Technique</th>
                         <th>Attempts</th>
-                        <th>Success Rate</th>
+                        <th>Detection Rate</th>
                         <th>Avg Confidence</th>
                     </tr>
         """
@@ -338,7 +332,7 @@ class SparkleAnalyzer:
         html += """
                 </table>
                 
-                <h2>Top Attackers</h2>
+                <h2>Top Users</h2>
                 <table>
                     <tr>
                         <th>User Hash</th>
@@ -349,22 +343,22 @@ class SparkleAnalyzer:
                     </tr>
         """
         
-        for attacker in top_attackers:
-            success_pct = attacker['success_rate'] * 100
+        for user in top_users:
+            success_pct = user['success_rate'] * 100
             html += f"""
                     <tr>
-                        <td><code>{attacker['user_hash']}</code></td>
-                        <td>{attacker['attempts']}</td>
-                        <td>{attacker['successful']}</td>
+                        <td><code>{user['user_hash']}</code></td>
+                        <td>{user['attempts']}</td>
+                        <td>{user['successful']}</td>
                         <td>{success_pct:.1f}%</td>
-                        <td>{attacker['secrets_gained']}</td>
+                        <td>{user['secrets_gained']}</td>
                     </tr>
             """
         
         html += """
                 </table>
                 
-                <h2>Common Attack Keywords</h2>
+                <h2>Common Keywords</h2>
                 <table>
                     <tr>
                         <th>Keyword</th>
@@ -397,7 +391,7 @@ class SparkleAnalyzer:
         """Print analysis summary to console"""
         
         print("\n" + "="*70)
-        print("SPARKLE HONEYPOT ANALYSIS REPORT")
+        print("SPARKLE ANALYSIS REPORT")
         print("="*70 + "\n")
         
         summary = self.get_summary_stats()
@@ -409,21 +403,21 @@ class SparkleAnalyzer:
             else:
                 print(f"  {key:.<40} {value}")
         
-        print("\n\nTOP JAILBREAK TECHNIQUES")
+        print("\n\nTOP TECHNIQUES DETECTED")
         print("-" * 70)
         techniques = self.get_technique_analysis()
         for technique, stats in list(techniques.items())[:5]:
             print(f"  {technique}")
-            print(f"    Attempts: {stats['count']}, Success Rate: {stats['success_rate']*100:.1f}%")
+            print(f"    Attempts: {stats['count']}, Detection Rate: {stats['success_rate']*100:.1f}%")
             print(f"    Avg Confidence: {stats['avg_confidence']}")
         
-        print("\n\nTOP ATTACKERS")
+        print("\n\nTOP USERS")
         print("-" * 70)
-        top_attackers = self.get_top_attackers(5)
-        for i, attacker in enumerate(top_attackers, 1):
-            print(f"  {i}. {attacker['user_hash']}")
-            print(f"     Attempts: {attacker['attempts']}, Success Rate: {attacker['success_rate']*100:.1f}%")
-            print(f"     Secrets Gained: {attacker['secrets_gained']}")
+        top_users = self.get_top_users(5)
+        for i, user in enumerate(top_users, 1):
+            print(f"  {i}. {user['user_hash']}")
+            print(f"     Attempts: {user['attempts']}, Success Rate: {user['success_rate']*100:.1f}%")
+            print(f"     Secrets Gained: {user['secrets_gained']}")
         
         print("\n" + "="*70 + "\n")
 
@@ -434,7 +428,7 @@ def main():
     analyzer = SparkleAnalyzer()
     
     if not analyzer.logs:
-        print("No logs found. Run Sparkle honeypot to generate logs.")
+        print("No logs found. Run Sparkle to generate logs.")
         return
     
     if len(sys.argv) > 1 and sys.argv[1] == "--html":
