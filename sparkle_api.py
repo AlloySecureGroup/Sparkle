@@ -12,6 +12,12 @@ from flask_cors import CORS
 import os
 import json
 from sparkle_engine import SparkleEngine
+from sparkle_fingerprint import (
+    is_mimicry_enabled,
+    build_root_response,
+    register_probe_endpoints,
+    get_mimic_target,
+)
 
 
 app = Flask(__name__)
@@ -20,10 +26,17 @@ CORS(app)
 # Initialize the engine
 sparkle = SparkleEngine()
 
+# Adds /api/tags (etc.) for the active SPARKLE_MIMIC_SERVICE target, if any
+register_probe_endpoints(app, sparkle)
+
 
 @app.route('/', methods=['GET'])
 def root():
-    """Root endpoint"""
+    """Root endpoint - mimics the active fingerprint target's signature
+    when SPARKLE_MIMIC_SERVICE is set, otherwise returns service info."""
+    if is_mimicry_enabled():
+        return build_root_response()
+
     return jsonify({
         "service": sparkle.name,
         "version": "1.0.0",
@@ -153,7 +166,8 @@ def get_config():
         "vulnerability_level": sparkle.config.get("vulnerability_level"),
         "max_secrets_per_session": sparkle.config.get("max_secrets_per_session"),
         "logs_dir": sparkle.config.get("logs_dir"),
-        "enable_api": sparkle.config.get("enable_api")
+        "enable_api": sparkle.config.get("enable_api"),
+        "fingerprint_mimic_target": get_mimic_target()
     })
 
 
@@ -270,6 +284,13 @@ if __name__ == '__main__':
     print(f"{sparkle.name.upper()} - Open Access (No Authentication)")
     print("=" * 70)
     print(f"\nListening on http://0.0.0.0:{port}")
+    mimic = get_mimic_target()
+    if mimic != "off":
+        print(f"Fingerprint mimicry: ACTIVE (impersonating '{mimic}')")
+        print(f"  GET /          -> {mimic} root signature")
+        print(f"  GET /api/tags  -> {mimic} model-list signature")
+    else:
+        print("Fingerprint mimicry: off (SPARKLE_MIMIC_SERVICE not set)")
     print("\nAvailable endpoints (NO AUTH REQUIRED):")
     print("  GET  http://localhost:{}/              - Service info".format(port))
     print("  GET  http://localhost:{}/docs          - API documentation".format(port))
