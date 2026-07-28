@@ -20,6 +20,9 @@ services:
       # Runtime parameter: change this to point at a different secrets file
       # without rebuilding the image, e.g. ./custom_secrets.yaml
       SPARKLE_SECRETS_FILE: /sparkle/secrets.yaml
+      # Runtime parameter: which real LLM service's HTTP signature to
+      # mimic (currently: ollama). Set to "off" to disable.
+      SPARKLE_MIMIC_SERVICE: ${SPARKLE_MIMIC_SERVICE:-ollama}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]

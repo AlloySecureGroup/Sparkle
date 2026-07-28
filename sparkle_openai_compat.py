@@ -15,6 +15,12 @@ import json
 import uuid
 from datetime import datetime
 from sparkle_engine import SparkleEngine
+from sparkle_fingerprint import (
+    is_mimicry_enabled,
+    build_root_response,
+    register_probe_endpoints,
+    get_mimic_target,
+)
 
 
 app = Flask(__name__)
@@ -22,6 +28,9 @@ CORS(app)
 
 # Initialize the engine
 sparkle = SparkleEngine()
+
+# Adds /api/tags (etc.) for the active SPARKLE_MIMIC_SERVICE target, if any
+register_probe_endpoints(app, sparkle)
 
 # Model id shown in Open WebUI's model picker - renamable at runtime
 MODEL_ID = os.environ.get("SPARKLE_MODEL_ID", "sparkle")
@@ -153,7 +162,11 @@ def chat_completions_stream():
 
 @app.route('/', methods=['GET'])
 def root():
-    """Root endpoint"""
+    """Root endpoint - mimics the active fingerprint target's signature
+    when SPARKLE_MIMIC_SERVICE is set, otherwise returns service info."""
+    if is_mimicry_enabled():
+        return build_root_response()
+
     return jsonify({
         "service": f"{sparkle.name} (OpenAI Compatible)",
         "version": "1.0.0",
@@ -257,6 +270,11 @@ if __name__ == '__main__':
     print(f"{sparkle.name.upper()} - OpenAI Compatible API")
     print("=" * 70)
     print(f"\nListening on http://0.0.0.0:{port}")
+    mimic = get_mimic_target()
+    if mimic != "off":
+        print(f"Fingerprint mimicry: ACTIVE (impersonating '{mimic}')")
+    else:
+        print("Fingerprint mimicry: off (SPARKLE_MIMIC_SERVICE not set)")
     print("\nOpenAI-Compatible Endpoints:")
     print(f"  POST http://localhost:{port}/v1/chat/completions")
     print(f"  GET  http://localhost:{port}/v1/models")

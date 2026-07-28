@@ -26,6 +26,9 @@ services:
       # Runtime parameter: point at a different secrets file without
       # rebuilding the image, e.g. /sparkle/custom_secrets.yaml
       SPARKLE_SECRETS_FILE: /sparkle/secrets.yaml
+      # Runtime parameter: which real LLM service's HTTP signature to
+      # mimic (currently: ollama). Set to "off" to disable.
+      SPARKLE_MIMIC_SERVICE: ${SPARKLE_MIMIC_SERVICE:-ollama}
     restart: unless-stopped
     command: python sparkle_openai_compat.py
     healthcheck:
@@ -63,4 +66,3 @@ networks:
 
 volumes:
   open-webui-data:
-
